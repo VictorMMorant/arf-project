@@ -8,6 +8,7 @@ import os
 import time
 import datetime
 import preprocessing
+import utils
 from SentimentCNN import SentimentCNN
 
 # Parameters
@@ -22,9 +23,7 @@ tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 50, "Batch Size")
-tf.flags.DEFINE_integer("num_epochs", 200, "Number of training epochs")
-tf.flags.DEFINE_integer("evaluate_every", 100, "Evaluate model on dev set after this many steps")
-tf.flags.DEFINE_integer("checkpoint_every", 100, "Save model after this many steps")
+tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs")
 
 # Config Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
@@ -74,7 +73,19 @@ with tf.Graph().as_default():
         grads_and_vars = optimizer.compute_gradients(cnn.loss)
         train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 
-          #TODO: Add Summaries and Checkpoints to the training process
+        #TODO: Add Summaries to the training process
+
+        # Output directory for models and summaries
+        timestamp = str(int(time.time()))
+        out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs", timestamp))
+        print("Writing to {}\n".format(out_dir))
+
+        # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
+        checkpoint_dir = os.path.abspath(os.path.join(out_dir, "checkpoints"))
+        checkpoint_prefix = os.path.join(checkpoint_dir, "model")
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
+        saver = tf.train.Saver(tf.all_variables())
 
         # Initialize all variables
         sess.run(tf.initialize_all_variables())
@@ -92,29 +103,9 @@ with tf.Graph().as_default():
                 [train_op, global_step, cnn.loss, cnn.accuracy],feed_dict)
             time_str = datetime.datetime.now().isoformat()
             print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
-            
-
-        def batch_iter(data, batch_size, num_epochs, shuffle=True):
-            """
-            Generates a batch iterator for a dataset.
-            """
-            data = np.array(data)
-            data_size = len(data)
-            num_batches_per_epoch = int(len(data)/batch_size) + 1
-            for epoch in range(num_epochs):
-                # Shuffle the data at each epoch
-                if shuffle:
-                    shuffle_indices = np.random.permutation(np.arange(data_size))
-                    shuffled_data = data[shuffle_indices]
-                else:
-                    shuffled_data = data
-                for batch_num in range(num_batches_per_epoch):
-                    start_index = batch_num * batch_size
-                    end_index = min((batch_num + 1) * batch_size, data_size)
-                    yield shuffled_data[start_index:end_index]
 
         # Generate batches
-        batches = batch_iter(
+        batches = utils.batch_iter(
             list(zip(x, y)), FLAGS.batch_size, FLAGS.num_epochs)
 
         # Training loop. For each batch...
@@ -122,3 +113,6 @@ with tf.Graph().as_default():
             x_batch, y_batch = zip(*batch)
             train_step(x_batch, y_batch)
             current_step = tf.train.global_step(sess, global_step)
+
+        path = saver.save(sess, checkpoint_prefix, global_step=current_step)
+        print("Saved model checkpoint to {}\n".format(path))
