@@ -46,7 +46,7 @@ def load_data(path):
 	vocabulary = build_vocabulary(padded_tweets)
 
 	#Mapping words with values in the vocabulary
-	x = np.array([[vocabulary[word] for word in t] for t in tweets])
+	x = np.array([[vocabulary[word] for word in t] for t in padded_tweets])
 
 	return [x, y, vocabulary]
 
@@ -55,7 +55,7 @@ def padding(sentences):
 		Force all the sentences to be of the same length by filling with <PAD/>
 	"""
 	maxLength = max(len(s) for s in sentences)
-	print(maxLength)
+	
 	padded_sentences = []
 	for i in range(len(sentences)):
 		s = sentences[i]

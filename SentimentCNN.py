@@ -1,5 +1,5 @@
 """
-	A CNN Model for Sentence-Level Sentiment Classification
+    A CNN Model for Sentence-Level Sentiment Classification
 """
 
 import tensorflow as tf
@@ -72,6 +72,11 @@ class SentimentCNN(object):
             b = tf.Variable(tf.constant(0.1, shape=[num_classes]), name="b")
             self.scores = tf.nn.xw_plus_b(self.h_drop, W, b, name="scores")
             self.predictions = tf.argmax(self.scores, 1, name="predictions")
+
+        # Calculate mean cross-entropy loss
+        with tf.name_scope("loss"):
+            losses = tf.nn.softmax_cross_entropy_with_logits(self.scores, self.input_y)
+            self.loss = tf.reduce_mean(losses)
 
         # Accuracy
         with tf.name_scope("accuracy"):
