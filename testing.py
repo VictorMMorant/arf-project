@@ -53,7 +53,7 @@ with graph.as_default():
 
         # Tensors we want to evaluate
         predictions = graph.get_operation_by_name("output/predictions").outputs[0]
-        print(predictions)
+        print(predictions.get_shape())
         # Generate batches for one epoch
         #batches = utils.batch_iter(x, FLAGS.batch_size, 1, shuffle=False)
 
@@ -69,3 +69,7 @@ with graph.as_default():
 correct_predictions = float(sum(all_predictions == y))
 print("Total number of test examples: {}".format(len(y)))
 print("Accuracy: {:g}".format(correct_predictions/float(len(y))))
+
+
+
+
