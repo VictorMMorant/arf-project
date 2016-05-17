@@ -14,16 +14,17 @@ from SentimentCNN import SentimentCNN
 # Parameters
 # ==================================================
 
-#Flags are command-line arguments to our program
+# Flags are command-line arguments to our program
 # Model Hyperparameters
 tf.flags.DEFINE_integer("embedding_dim", 128, "Dimensionality of character embedding")
 tf.flags.DEFINE_string("filter_sizes", "3,4,5", "Comma-separated filter sizes")
-tf.flags.DEFINE_integer("num_filters", 100, "Number of filters per filter size")
+tf.flags.DEFINE_integer("num_filters", 128, "Number of filters per filter size")
 tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability")
 
 # Training parameters
-tf.flags.DEFINE_integer("batch_size", 50, "Batch Size")
-tf.flags.DEFINE_integer("num_epochs", 10, "Number of training epochs")
+tf.flags.DEFINE_integer("batch_size", 64, "Batch Size")
+tf.flags.DEFINE_integer("num_epochs", 20, "Number of training epochs")
+tf.flags.DEFINE_integer("test_every", 100, "Steps to test the trained model with the testing partition")
 
 # Config Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
@@ -36,17 +37,17 @@ for attr, value in sorted(FLAGS.__flags.items()):
     print("{}={}".format(attr.upper(), value))
 print("")
 
+# Data Preparatopn
+# ==================================================
 
+x, y, vocabulary, trainingPartitionLength = preprocessing.load_corpus("./data/tweets2013_train.txt","./data/tweets2013_test.txt")
 
+x_train, x_test = x[:trainingPartitionLength], x[trainingPartitionLength:]
+y_train, y_test = y[:trainingPartitionLength], y[trainingPartitionLength:]
 
-# Load data
-print("Loading Training data...")
-x, y, vocabulary = preprocessing.load_data('./data/tweets2013_train.txt')
-print("Number of Tweets: {:d}".format(x.shape[0]))
-print("Vocabulary Size: {:d}".format(len(vocabulary)))
-
-
-
+print("Number of Tweets Train: {:d}".format(x_train.shape[0]))
+print("Vocabulary Size Train: {:d}".format(len(vocabulary)))
+print("Number of Tweets Test: {:d}".format(x_test.shape[0]))
 
 # Training
 # ==================================================
@@ -58,7 +59,7 @@ with tf.Graph().as_default():
     sess = tf.Session(config=session_conf)
     with sess.as_default():
         cnn = SentimentCNN(
-            sequence_length=x.shape[1],
+            sequence_length=x_train.shape[1],
             #Positive, Neutral, Negative
             num_classes=3,
             vocab_size=len(vocabulary),
@@ -73,19 +74,7 @@ with tf.Graph().as_default():
         grads_and_vars = optimizer.compute_gradients(cnn.loss)
         train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 
-        #TODO: Add Summaries to the training process
-
-        # Output directory for models and summaries
-        timestamp = str(int(time.time()))
-        out_dir = os.path.abspath(os.path.join(os.path.curdir, "runs", timestamp))
-        print("Writing to {}\n".format(out_dir))
-
-        # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
-        checkpoint_dir = os.path.abspath(os.path.join(out_dir, "checkpoints"))
-        checkpoint_prefix = os.path.join(checkpoint_dir, "model")
-        if not os.path.exists(checkpoint_dir):
-            os.makedirs(checkpoint_dir)
-        saver = tf.train.Saver(tf.all_variables())
+        
 
         # Initialize all variables
         sess.run(tf.initialize_all_variables())
@@ -104,15 +93,34 @@ with tf.Graph().as_default():
             time_str = datetime.datetime.now().isoformat()
             print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
 
+        def test_step(x_test,y_test):
+            
+            accuracy = sess.run(cnn.accuracy, {cnn.input_x: x_test, cnn.input_y: y_test, cnn.dropout_keep_prob: 1.0})
+                
+            # Print accuracy
+            print("=======TESTING========")
+            print("Total number of test examples: {}".format(len(y_test)))
+            print("Accuracy: {:g}".format(accuracy)) 
+
+        #Training Phase
+
         # Generate batches
         batches = utils.batch_iter(
-            list(zip(x, y)), FLAGS.batch_size, FLAGS.num_epochs)
+            list(zip(x_train, y_train)), FLAGS.batch_size, FLAGS.num_epochs)
 
         # Training loop. For each batch...
+        i = 0
         for batch in batches:
             x_batch, y_batch = zip(*batch)
             train_step(x_batch, y_batch)
             current_step = tf.train.global_step(sess, global_step)
 
-        path = saver.save(sess, checkpoint_prefix, global_step=current_step)
-        print("Saved model checkpoint to {}\n".format(path))
+            # Test with Testing Partition
+            if i % FLAGS.test_every == 0:
+                test_step(x_test,y_test)
+            i +=1 
+
+        #Testing Phase
+        #test_step(x_test,y_test)
+
+

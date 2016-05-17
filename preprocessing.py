@@ -6,7 +6,25 @@ import emoticons_ES
 import twokenize_ES
 
 
-#Retrieve training data
+
+def load_corpus(train_path,test_path):
+
+	# Load data Training
+	print("Loading Training data...")
+	tweets, target = load_data(train_path)
+	trainingPartitionLength = len(target)
+	# Load data Testing
+	print("Loading Testing data...")
+	tweets_test, target_test = load_data(test_path)
+
+	all_tweets = tweets+tweets_test
+	all_target = target+target_test
+	
+	
+	x, y, vocabulary = format_data(all_tweets,all_target)
+
+	return [x, y, vocabulary, trainingPartitionLength]
+
 def load_data(path):
 	"""
 		Load the tweets and labels from the data file in the path.
@@ -37,10 +55,14 @@ def load_data(path):
 			else:
 				target.append([0,1,0])
 
-	y = np.array(target)
+	return [tweets,target]
 
+def format_data(tw,tar):
+
+	#Calculate maxLength
+	maxLength = calculateMaxLength(tw)
 	#Padding tweets...
-	padded_tweets = padding(tweets)
+	padded_tweets = padding(tw, maxLength)
 
 	#Building vocabulary
 	vocabulary = build_vocabulary(padded_tweets)
@@ -48,13 +70,14 @@ def load_data(path):
 	#Mapping words with values in the vocabulary
 	x = np.array([[vocabulary[word] for word in t] for t in padded_tweets])
 
-	return [x, y, vocabulary]
+	y = np.array(tar)
 
-def padding(sentences):
+	return [x,y,vocabulary]
+
+def padding(sentences, maxLength):
 	"""
 		Force all the sentences to be of the same length by filling with <PAD/>
 	"""
-	maxLength = max(len(s) for s in sentences)
 	
 	padded_sentences = []
 	for i in range(len(sentences)):
@@ -77,4 +100,8 @@ def build_vocabulary(sentences):
 	vocabulary = {x: i for i, x in enumerate(words)}
 
 	return vocabulary
+
+def calculateMaxLength(sentences):
+	return max(len(s) for s in sentences)
+
 
